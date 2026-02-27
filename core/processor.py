@@ -31,11 +31,12 @@ class VideoProcessor:
                 self.callbacks['preview_first_frame'](first_frame_path)
 
                 preview_paths = []
+                fov = settings["fov"]
                 for i, (yaw, pitch, roll) in enumerate(transforms):
                     self.log(f"  - 適用後プレビュー {i + 1}/{len(transforms)} を生成中... (Y:{yaw}, P:{pitch})")
                     preview_after_path = os.path.join(self.temp_dir.name, f"preview_after_{i}.jpg")
                     
-                    filter_list = [f'v360=output=rectilinear:h_fov={settings["h_fov"]}:v_fov={settings["v_fov"]}:w=480:h=480:yaw={yaw}:pitch={pitch}:roll={roll}']
+                    filter_list = [f'v360=output=rectilinear:h_fov={fov}:v_fov={fov}:w=480:h=480:yaw={yaw}:pitch={pitch}:roll={roll}']
                     if settings.get('lut_path') and os.path.exists(settings['lut_path']):
                         filter_list.append(f"lut3d=file='{sanitize_path_for_ffmpeg_filter(settings['lut_path'])}'")
                     eq_options = f'eq=saturation={settings["saturation"]}:contrast={settings["contrast"]}:brightness={settings["brightness"]}:gamma={settings["gamma"]}'
@@ -66,12 +67,11 @@ class VideoProcessor:
                 output_dir = os.path.join(os.path.dirname(video_path), "output_images")
                 os.makedirs(output_dir, exist_ok=True)
 
-                output_width = settings['width']
-                h_fov = settings['h_fov']
-                v_fov = settings['v_fov']
-                output_height = int(output_width * (v_fov / h_fov))
-                if output_height <= 0:
-                    raise ValueError("計算後の高さが0以下です。")
+                output_size = settings['size']
+                fov = settings['fov']
+                
+                if output_size <= 0:
+                    raise ValueError("出力サイズが0以下です。")
 
                 color_filter_list = []
                 if settings.get('lut_path') and os.path.exists(settings['lut_path']):
@@ -92,7 +92,7 @@ class VideoProcessor:
                     self.callbacks['progress'](index, total_tasks, f"視点 {index + 1}/{total_tasks} を処理中...")
 
                     filter_chain = [
-                        f'v360=input=e:output=rectilinear:h_fov={h_fov}:v_fov={v_fov}:w={output_width}:h={output_height}:yaw={yaw}:pitch={pitch}:roll={roll}',
+                        f'v360=input=e:output=rectilinear:h_fov={fov}:v_fov={fov}:w={output_size}:h={output_size}:yaw={yaw}:pitch={pitch}:roll={roll}',
                         f"fps={settings['fps']}"
                     ]
                     filter_chain.extend(color_filter_list)

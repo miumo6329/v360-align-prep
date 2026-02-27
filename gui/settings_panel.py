@@ -8,9 +8,9 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         
         self.video_path_var = ctk.StringVar()
         self.lut_path_var = ctk.StringVar()
-        self.h_fov_var = ctk.DoubleVar(value=90.0)
-        self.v_fov_var = ctk.DoubleVar(value=90.0)
-        self.width_var = ctk.StringVar(value="1920")
+        
+        self.fov_var = ctk.DoubleVar(value=90.0)
+        self.size_var = ctk.StringVar(value="1920")
         self.fps_var = ctk.StringVar(value="1.0")
         
         self.saturation_var = ctk.DoubleVar(value=1.0)
@@ -51,14 +51,13 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         param_frame = ctk.CTkFrame(self, fg_color="transparent")
         param_frame.pack(fill="x", padx=10, pady=5)
         
-        self._add_slider_row(param_frame, "水平FOV", self.h_fov_var, 30, 160, 130, row=0)
-        self._add_slider_row(param_frame, "垂直FOV", self.v_fov_var, 30, 160, 130, row=1)
+        self._add_slider_row(param_frame, "FOV (視野角)", self.fov_var, 30, 160, 130, row=0)
         
-        ctk.CTkLabel(param_frame, text="出力幅(px)").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-        ctk.CTkEntry(param_frame, textvariable=self.width_var, width=80).grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(param_frame, text="出力サイズ(px)").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        ctk.CTkEntry(param_frame, textvariable=self.size_var, width=80).grid(row=1, column=1, sticky="w", padx=5, pady=5)
         
-        ctk.CTkLabel(param_frame, text="出力FPS").grid(row=3, column=0, sticky="e", padx=5, pady=5)
-        ctk.CTkEntry(param_frame, textvariable=self.fps_var, width=80).grid(row=3, column=1, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(param_frame, text="出力FPS").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        ctk.CTkEntry(param_frame, textvariable=self.fps_var, width=80).grid(row=2, column=1, sticky="w", padx=5, pady=5)
 
         ctk.CTkFrame(self, height=2, fg_color="gray").pack(fill="x", padx=10, pady=10)
 
@@ -92,7 +91,7 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         val_label.grid(row=row, column=2, sticky="w", padx=5)
         
         def update_lbl(*args):
-            val_label.configure(text=f"{variable.get():.2f}")
+            val_label.configure(text=f"{variable.get():.0f}" if label_text.startswith("FOV") else f"{variable.get():.2f}")
         variable.trace_add("write", update_lbl)
         update_lbl()
 
@@ -125,9 +124,8 @@ class SettingsPanel(ctk.CTkScrollableFrame):
         return {
             'video_path': self.video_path_var.get(),
             'lut_path': self.lut_path_var.get(),
-            'h_fov': self.h_fov_var.get(),
-            'v_fov': self.v_fov_var.get(),
-            'width': int(self.width_var.get() or 1920),
+            'fov': self.fov_var.get(),
+            'size': int(self.size_var.get() or 1920),
             'fps': self.fps_var.get() or "2.0",
             'saturation': self.saturation_var.get(),
             'contrast': self.contrast_var.get(),
