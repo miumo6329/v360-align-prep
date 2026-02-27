@@ -7,6 +7,38 @@ from core.processor import VideoProcessor
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
+class LogWindow(ctk.CTkToplevel):
+    """ログを表示用ポップアップウィンドウ"""
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.title("実行ログ")
+        self.geometry("700x500")
+        
+        # [×]ボタンを押したときにウィンドウを破棄せず、隠すだけにする
+        self.protocol("WM_DELETE_WINDOW", self.hide_window)
+        
+        self.textbox = ctk.CTkTextbox(self, font=ctk.CTkFont(family="Consolas", size=12))
+        self.textbox.pack(fill="both", expand=True, padx=10, pady=10)
+        self.textbox.configure(state="disabled")
+        
+        self.btn_clear = ctk.CTkButton(self, text="ログをクリア", command=self.clear_log)
+        self.btn_clear.pack(side="bottom", pady=(0, 10))
+
+    def hide_window(self):
+        self.withdraw()
+        
+    def append_log(self, msg):
+        self.textbox.configure(state="normal")
+        self.textbox.insert("end", msg + "\n")
+        self.textbox.see("end")
+        self.textbox.configure(state="disabled")
+        
+    def clear_log(self):
+        self.textbox.configure(state="normal")
+        self.textbox.delete("1.0", "end")
+        self.textbox.configure(state="disabled")
+
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -14,15 +46,19 @@ class App(ctk.CTk):
         self.geometry("1200x800")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=4)
-        self.grid_columnconfigure(1, weight=6)
+        # 1. メイン領域 (左:設定, 右:プレビュー)
+        self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_frame.pack(fill="both", expand=True)
         
-        self.left_container = ctk.CTkFrame(self)
-        self.left_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.main_frame.grid_rowconfigure(0, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=4)
+        self.main_frame.grid_columnconfigure(1, weight=6)
         
-        self.preview_panel = PreviewPanel(self)
-        self.preview_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 10), pady=10)
+        self.left_container = ctk.CTkFrame(self.main_frame)
+        self.left_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 0))
+        
+        self.preview_panel = PreviewPanel(self.main_frame)
+        self.preview_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 10), pady=(10, 0))
         
         self.settings_panel = SettingsPanel(self.left_container)
         self.settings_panel.pack(fill="both", expand=True)
@@ -46,11 +82,19 @@ class App(ctk.CTk):
         self.progress_bar.pack(fill="x", pady=5)
         self.progress_bar.set(0)
         
-        self.log_label = ctk.CTkLabel(self.left_container, text="ログ:")
-        self.log_label.pack(anchor="w", padx=5)
-        self.log_textbox = ctk.CTkTextbox(self.left_container, height=150)
-        self.log_textbox.pack(fill="x", padx=5, pady=(0, 5))
-        self.log_textbox.configure(state="disabled")
+        # 2. ステータスバー (最下部)
+        self.statusbar = ctk.CTkFrame(self, height=35, corner_radius=0)
+        self.statusbar.pack(fill="x", side="bottom")
+
+        self.btn_show_log = ctk.CTkButton(self.statusbar, text="ログウィンドウ表示", width=140, height=24, command=self.toggle_log_window)
+        self.btn_show_log.pack(side="right", padx=10, pady=5)
+
+        self.lbl_status = ctk.CTkLabel(self.statusbar, text="準備完了", anchor="w")
+        self.lbl_status.pack(side="left", fill="x", expand=True, padx=10)
+
+        # 3. ログウィンドウの初期化 (起動時は非表示)
+        self.log_window = LogWindow(self)
+        self.log_window.withdraw()
 
         self.processor = VideoProcessor({
             'log': self.append_log,
@@ -61,16 +105,23 @@ class App(ctk.CTk):
             'done': self.on_run_done
         })
 
+    def toggle_log_window(self):
+        if self.log_window.state() == "withdrawn":
+            self.log_window.deiconify()  # ウィンドウを表示
+        self.log_window.focus()          # ウィンドウを最前面に
+
     def append_log(self, msg):
         def _update():
-            self.log_textbox.configure(state="normal")
-            self.log_textbox.insert("end", msg + "\n")
-            self.log_textbox.see("end")
-            self.log_textbox.configure(state="disabled")
+            self.log_window.append_log(msg)
+            # ステータスバーにも最新の1行を表示
+            last_line = msg.strip().split('\n')[-1]
+            if last_line:
+                self.lbl_status.configure(text=last_line)
         self.after(0, _update)
 
     def show_error(self, err_msg):
-        self.append_log(f"エラー:\n{err_msg}")
+        self.append_log(f"\n[エラー]\n{err_msg}\n")
+        self.toggle_log_window()  # エラー時は自動でログウィンドウを開く
         
     def _validate_inputs(self):
         settings = self.settings_panel.get_settings()
@@ -112,17 +163,18 @@ class App(ctk.CTk):
         self.btn_run.configure(state="disabled")
         self.btn_cancel.configure(state="normal")
         
-        self.progress_frame.pack(fill="x", padx=5, pady=5, before=self.log_label)
+        self.progress_frame.pack(fill="x", padx=5, pady=5)
         self.progress_bar.set(0)
         self.lbl_progress.configure(text="処理を開始しています...")
         
-        self.append_log("--- 本処理を開始します ---")
+        self.append_log("\n--- 本処理を開始します ---")
         self.processor.run_processing_async(settings['video_path'], transforms, settings)
 
     def on_progress(self, current, total, msg):
         def _update():
             self.progress_bar.set(current / total if total > 0 else 0)
             self.lbl_progress.configure(text=msg)
+            self.lbl_status.configure(text=msg)
         self.after(0, _update)
 
     def on_run_done(self, success_count, total_tasks, cancelled, output_dir):
@@ -134,7 +186,6 @@ class App(ctk.CTk):
                 self.append_log(f"全ての処理が完了しました！\n出力先: {os.path.abspath(output_dir)}")
             else:
                 self.append_log(f"いくつかの処理に失敗しました。({success_count}/{total_tasks} 完了)")
-            self.append_log("==================================================\n")
             
             self.btn_preview.configure(state="normal")
             self.btn_run.configure(state="normal")

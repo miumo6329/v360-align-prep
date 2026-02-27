@@ -2,6 +2,7 @@ import subprocess
 import threading
 import os
 import traceback
+import time
 
 class FFmpegRunner:
     @staticmethod
@@ -37,6 +38,7 @@ class FFmpegRunner:
             reader = threading.Thread(target=reader_thread)
             reader.start()
 
+            # プロセスが終了するまでループで監視
             while process.poll() is None:
                 if cancel_event and cancel_event.is_set():
                     if logger:
@@ -45,7 +47,7 @@ class FFmpegRunner:
                     process.wait()
                     reader.join()
                     return False, True, "Cancelled"
-                process.wait(timeout=0.1)
+                time.sleep(0.1)
 
             reader.join()
             if process.returncode == 0:
