@@ -1,6 +1,5 @@
-def main():
-    print("Hello from v360-align-prep!")
-
+from gui.app import App
 
 if __name__ == "__main__":
-    main()
+    app = App()
+    app.mainloop()
