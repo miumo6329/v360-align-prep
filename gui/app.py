@@ -3,6 +3,12 @@ import os
 from gui.settings_panel import SettingsPanel
 from gui.preview_panel import PreviewPanel
 from core.processor import VideoProcessor
+from constants import (
+    COLOR_PREVIEW_NORMAL, COLOR_PREVIEW_HOVER, COLOR_PREVIEW_DISABLED,
+    COLOR_RUN_NORMAL, COLOR_RUN_HOVER, COLOR_RUN_DISABLED,
+    COLOR_CANCEL_NORMAL, COLOR_CANCEL_HOVER, COLOR_CANCEL_DISABLED,
+    COLOR_TEXT_DISABLED
+)
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -70,22 +76,22 @@ class App(ctk.CTk):
         # ボタンの初期化       
         self.btn_preview = ctk.CTkButton(
             self.action_frame, text="プレビュー更新", command=self.on_preview,
-            fg_color="#1f538d", hover_color="#14375e", 
-            text_color_disabled="#777777"
+            fg_color=COLOR_PREVIEW_NORMAL, hover_color=COLOR_PREVIEW_HOVER, 
+            text_color_disabled=COLOR_TEXT_DISABLED
         )
         self.btn_preview.pack(side="left", padx=5, expand=True, fill="x")
         
         self.btn_run = ctk.CTkButton(
             self.action_frame, text="本実行", command=self.on_run, 
-            fg_color="#28a745", hover_color="#218838",
-            text_color_disabled="#6c757d"
+            fg_color=COLOR_RUN_NORMAL, hover_color=COLOR_RUN_HOVER,
+            text_color_disabled=COLOR_TEXT_DISABLED
         )
         self.btn_run.pack(side="left", padx=5, expand=True, fill="x")
         
         self.btn_cancel = ctk.CTkButton(
             self.action_frame, text="中止", command=self.on_cancel, 
-            fg_color="#dc3545", hover_color="#c82333",
-            text_color_disabled="#6c757d"
+            fg_color=COLOR_CANCEL_NORMAL, hover_color=COLOR_CANCEL_HOVER,
+            text_color_disabled=COLOR_TEXT_DISABLED
         )
         self.btn_cancel.pack(side="left", padx=5, expand=True, fill="x")
         
@@ -126,19 +132,19 @@ class App(ctk.CTk):
         """ボタンの有効/無効状態と色を一括で更新する"""
         
         if preview:
-            self.btn_preview.configure(state="normal", fg_color="#1f538d")
+            self.btn_preview.configure(state="normal", fg_color=COLOR_PREVIEW_NORMAL)
         else:
-            self.btn_preview.configure(state="disabled", fg_color="#0d243d") # 暗い青
+            self.btn_preview.configure(state="disabled", fg_color=COLOR_PREVIEW_DISABLED) # 暗い青
 
         if run:
-            self.btn_run.configure(state="normal", fg_color="#28a745")
+            self.btn_run.configure(state="normal", fg_color=COLOR_RUN_NORMAL)
         else:
-            self.btn_run.configure(state="disabled", fg_color="#114a1e") # 暗い緑
+            self.btn_run.configure(state="disabled", fg_color=COLOR_RUN_DISABLED) # 暗い緑
 
         if cancel:
-            self.btn_cancel.configure(state="normal", fg_color="#dc3545")
+            self.btn_cancel.configure(state="normal", fg_color=COLOR_CANCEL_NORMAL)
         else:
-            self.btn_cancel.configure(state="disabled", fg_color="#63141d") # 暗い赤
+            self.btn_cancel.configure(state="disabled", fg_color=COLOR_CANCEL_DISABLED) # 暗い赤
 
 
     def toggle_log_window(self):
