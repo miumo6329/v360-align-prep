@@ -69,6 +69,7 @@ class VideoProcessor:
 
                 output_size = settings['size']
                 fov = settings['fov']
+                video_name = os.path.splitext(os.path.basename(video_path))[0]
                 
                 if output_size <= 0:
                     raise ValueError("出力サイズが0以下です。")
@@ -96,10 +97,22 @@ class VideoProcessor:
                         f"fps={settings['fps']}"
                     ]
                     filter_chain.extend(color_filter_list)
+                    
+                    # タイムベースをミリ秒(1/1000)にし、PTSを経過時間(秒)×1000 に設定する
+                    filter_chain.append("settb=1/1000")
+                    filter_chain.append("setpts='round(T*1000)'")
                     final_filters = ",".join(filter_chain)
                     
-                    output_file_pattern = os.path.join(output_dir, f'Y{yaw:+04d}_P{pitch:+03d}_frame_%04d.jpg')
-                    cmd = ['ffmpeg', '-y', '-i', video_path, '-vf', final_filters, '-qmin', '1', '-q', '1', output_file_pattern]
+                    output_file_pattern = os.path.join(output_dir, f'{video_name}_Y{yaw:+04d}_P{pitch:+03d}_%08d.jpg')
+
+                    # -frame_pts 1 と -vsync 0 を指定して、PTS(ミリ秒)をそのままファイル名として出力する
+                    cmd = [
+                        'ffmpeg', '-y', '-i', video_path, 
+                        '-vf', final_filters, 
+                        '-vsync', '0', '-frame_pts', '1', 
+                        '-qmin', '1', '-q', '1', 
+                        output_file_pattern
+                    ]
 
                     desc = f"視点 {index + 1}/{total_tasks} (Y:{yaw}, P:{pitch}) の処理"
                     success, was_cancelled, err = FFmpegRunner.run_async(cmd, desc, self.cancel_event, self.log)
