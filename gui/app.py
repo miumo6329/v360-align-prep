@@ -8,7 +8,7 @@ ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
 class LogWindow(ctk.CTkToplevel):
-    """ログを表示用ポップアップウィンドウ"""
+    """ログ表示用ポップアップウィンドウ"""
     def __init__(self, master, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.title("実行ログ")
@@ -51,11 +51,12 @@ class App(ctk.CTk):
         self.main_frame.pack(fill="both", expand=True)
         
         self.main_frame.grid_rowconfigure(0, weight=1)
-        self.main_frame.grid_columnconfigure(0, weight=4)
-        self.main_frame.grid_columnconfigure(1, weight=6)
+        self.main_frame.grid_columnconfigure(0, weight=0, minsize=650)
+        self.main_frame.grid_columnconfigure(1, weight=1)
         
-        self.left_container = ctk.CTkFrame(self.main_frame)
+        self.left_container = ctk.CTkFrame(self.main_frame, width=650)
         self.left_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 0))
+        self.left_container.grid_propagate(False)
         
         self.preview_panel = PreviewPanel(self.main_frame)
         self.preview_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 10), pady=(10, 0))
@@ -66,13 +67,26 @@ class App(ctk.CTk):
         self.action_frame = ctk.CTkFrame(self.left_container, fg_color="transparent")
         self.action_frame.pack(fill="x", pady=10)
         
-        self.btn_preview = ctk.CTkButton(self.action_frame, text="プレビュー更新", command=self.on_preview)
+        # ボタンの初期化       
+        self.btn_preview = ctk.CTkButton(
+            self.action_frame, text="プレビュー更新", command=self.on_preview,
+            fg_color="#1f538d", hover_color="#14375e", 
+            text_color_disabled="#777777"
+        )
         self.btn_preview.pack(side="left", padx=5, expand=True, fill="x")
         
-        self.btn_run = ctk.CTkButton(self.action_frame, text="本実行", command=self.on_run, fg_color="green", hover_color="darkgreen")
+        self.btn_run = ctk.CTkButton(
+            self.action_frame, text="本実行", command=self.on_run, 
+            fg_color="#28a745", hover_color="#218838",
+            text_color_disabled="#6c757d"
+        )
         self.btn_run.pack(side="left", padx=5, expand=True, fill="x")
         
-        self.btn_cancel = ctk.CTkButton(self.action_frame, text="中止", command=self.on_cancel, fg_color="red", hover_color="darkred", state="disabled")
+        self.btn_cancel = ctk.CTkButton(
+            self.action_frame, text="中止", command=self.on_cancel, 
+            fg_color="#dc3545", hover_color="#c82333",
+            text_color_disabled="#6c757d"
+        )
         self.btn_cancel.pack(side="left", padx=5, expand=True, fill="x")
         
         self.progress_frame = ctk.CTkFrame(self.left_container, fg_color="transparent")
@@ -104,6 +118,28 @@ class App(ctk.CTk):
             'progress': self.on_progress,
             'done': self.on_run_done
         })
+        
+        # 初期状態のボタン色を適用
+        self._update_button_states(preview=True, run=True, cancel=False)
+
+    def _update_button_states(self, preview, run, cancel):
+        """ボタンの有効/無効状態と色を一括で更新する"""
+        
+        if preview:
+            self.btn_preview.configure(state="normal", fg_color="#1f538d")
+        else:
+            self.btn_preview.configure(state="disabled", fg_color="#0d243d") # 暗い青
+
+        if run:
+            self.btn_run.configure(state="normal", fg_color="#28a745")
+        else:
+            self.btn_run.configure(state="disabled", fg_color="#114a1e") # 暗い緑
+
+        if cancel:
+            self.btn_cancel.configure(state="normal", fg_color="#dc3545")
+        else:
+            self.btn_cancel.configure(state="disabled", fg_color="#63141d") # 暗い赤
+
 
     def toggle_log_window(self):
         if self.log_window.state() == "withdrawn":
@@ -140,8 +176,7 @@ class App(ctk.CTk):
         valid, settings, transforms = self._validate_inputs()
         if not valid: return
         
-        self.btn_preview.configure(state="disabled")
-        self.btn_run.configure(state="disabled")
+        self._update_button_states(preview=False, run=False, cancel=False)
         self.processor.generate_preview_async(settings['video_path'], transforms, settings)
 
     def on_preview_first_frame(self, path):
@@ -151,17 +186,14 @@ class App(ctk.CTk):
         def _update():
             if preview_paths:
                 self.preview_panel.update_after_images(preview_paths)
-            self.btn_preview.configure(state="normal")
-            self.btn_run.configure(state="normal")
+            self._update_button_states(preview=True, run=True, cancel=False)
         self.after(0, _update)
 
     def on_run(self):
         valid, settings, transforms = self._validate_inputs()
         if not valid: return
         
-        self.btn_preview.configure(state="disabled")
-        self.btn_run.configure(state="disabled")
-        self.btn_cancel.configure(state="normal")
+        self._update_button_states(preview=False, run=False, cancel=True)
         
         self.progress_frame.pack(fill="x", padx=5, pady=5)
         self.progress_bar.set(0)
@@ -186,15 +218,13 @@ class App(ctk.CTk):
             else:
                 self.append_log(f"いくつかの処理に失敗しました。({success_count}/{total_tasks} 完了)")
             
-            self.btn_preview.configure(state="normal")
-            self.btn_run.configure(state="normal")
-            self.btn_cancel.configure(state="disabled")
+            self._update_button_states(preview=True, run=True, cancel=False)
             self.progress_frame.pack_forget()
         self.after(0, _update)
 
     def on_cancel(self):
         self.append_log("--- 中止命令を受け付けました ---")
-        self.btn_cancel.configure(state="disabled")
+        self._update_button_states(preview=False, run=False, cancel=False)
         self.processor.cancel()
 
     def on_closing(self):
