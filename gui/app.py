@@ -174,7 +174,6 @@ class App(ctk.CTk):
         def _update():
             self.progress_bar.set(current / total if total > 0 else 0)
             self.lbl_progress.configure(text=msg)
-            self.lbl_status.configure(text=msg)
         self.after(0, _update)
 
     def on_run_done(self, success_count, total_tasks, cancelled, output_dir):

@@ -2,6 +2,7 @@ import os
 import threading
 import tempfile
 import traceback
+import time
 from core.ffmpeg_runner import FFmpegRunner
 from core.utils import sanitize_path_for_ffmpeg_filter
 
@@ -64,6 +65,9 @@ class VideoProcessor:
         self.cancel_event = threading.Event()
         def task():
             try:
+                # 動画の総再生時間を取得
+                total_duration = FFmpegRunner.get_video_duration(video_path)
+                
                 output_dir = os.path.join(os.path.dirname(video_path), "output_images")
                 os.makedirs(output_dir, exist_ok=True)
 
@@ -84,13 +88,45 @@ class VideoProcessor:
                 total_tasks = len(transforms)
                 success_count = 0
                 cancelled = False
+                
+                start_time = time.time()
 
                 for index, (yaw, pitch, roll) in enumerate(transforms):
                     if self.cancel_event.is_set():
                         cancelled = True
                         break
 
-                    self.callbacks['progress'](index, total_tasks, f"視点 {index + 1}/{total_tasks} を処理中...")
+                    # 進捗表示のコールバック関数
+                    def progress_cb(current_sec):
+                        if total_duration > 0:
+                            # 現在のタスクの進捗 (0.0 ~ 1.0)
+                            task_progress = max(0.0, min(1.0, current_sec / total_duration))
+                            # 全体の進捗 (0.0 ~ 1.0)
+                            overall_progress = (index + task_progress) / total_tasks
+                            
+                            elapsed_time = time.time() - start_time
+                            # 1%以上進んでいたら予測する（計算のブレを防ぐため）
+                            if overall_progress > 0.01:
+                                total_estimated = elapsed_time / overall_progress
+                                remain_sec = total_estimated - elapsed_time
+                                
+                                eta_struct = time.localtime(time.time() + remain_sec)
+                                eta_str = time.strftime("%H:%M:%S", eta_struct)
+                                
+                                rm_m, rm_s = divmod(int(remain_sec), 60)
+                                rm_h, rm_m = divmod(rm_m, 60)
+                                remain_str = f"{rm_h}時間{rm_m}分{rm_s}秒" if rm_h > 0 else f"{rm_m}分{rm_s}秒"
+                                
+                                msg = f"処理中 {index+1}/{total_tasks} ({overall_progress*100:.1f}%) | 残り: {remain_str} (終了予定: {eta_str})"
+                            else:
+                                msg = f"処理中 {index+1}/{total_tasks} ({overall_progress*100:.1f}%) | 計算中..."
+                        else:
+                            msg = f"処理中 {index+1}/{total_tasks}"
+                            overall_progress = index / total_tasks
+                            
+                        # app.pyの update_progress に渡す（1.0を最大値とする）
+                        self.callbacks['progress'](overall_progress, 1.0, msg)
+
 
                     filter_chain = [
                         f'v360=input=e:output=rectilinear:h_fov={fov}:v_fov={fov}:w={output_size}:h={output_size}:yaw={yaw}:pitch={pitch}:roll={roll}',
@@ -115,13 +151,15 @@ class VideoProcessor:
                     ]
 
                     desc = f"視点 {index + 1}/{total_tasks} (Y:{yaw}, P:{pitch}) の処理"
-                    success, was_cancelled, err = FFmpegRunner.run_async(cmd, desc, self.cancel_event, self.log)
+                    success, was_cancelled, err = FFmpegRunner.run_async(cmd, desc, self.cancel_event, self.log, progress_callback=progress_cb)
 
                     if was_cancelled:
                         cancelled = True
                         break
                     if success:
                         success_count += 1
+                        # タスク完了時に進捗を更新
+                        self.callbacks['progress']((index + 1) / total_tasks, 1.0, f"完了 {index+1}/{total_tasks}")
                     else:
                         self.callbacks['error'](err)
 

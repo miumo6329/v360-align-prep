@@ -3,14 +3,33 @@ import threading
 import os
 import traceback
 import time
+import re
 
 class FFmpegRunner:
+    # ログから時間(time=00:01:23.45)を抽出する正規表現
+    time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+
+    @staticmethod
+    def get_video_duration(video_path):
+        """動画の総再生時間（秒）を取得する"""
+        cmd = ['ffmpeg', '-i', video_path]
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        process = subprocess.run(cmd, stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace', creationflags=creationflags)
+        
+        # Duration: 00:02:30.50 などを探す
+        match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", process.stderr)
+        if match:
+            h, m, s = match.groups()
+            return int(h) * 3600 + int(m) * 60 + float(s)
+        return 0.0
+
     @staticmethod
     def run_sync(command, description="FFmpeg", logger=None):
         try:
             if logger:
                 logger(f"--- Running {description} Command (Sync) ---\n{' '.join(command)}")
-            subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', errors='replace')
+            creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+            subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', errors='replace', creationflags=creationflags)
             if logger:
                 logger(f"--- {description} Success ---")
             return True, None
@@ -19,7 +38,7 @@ class FFmpegRunner:
             return False, error_output
 
     @staticmethod
-    def run_async(command, description="FFmpeg", cancel_event=None, logger=None):
+    def run_async(command, description="FFmpeg", cancel_event=None, logger=None, progress_callback=None):
         if logger:
             logger(f"--- Running {description} Command (Async) ---\n{' '.join(command)}")
         try:
@@ -32,6 +51,13 @@ class FFmpegRunner:
                 try:
                     for line in iter(process.stderr.readline, ''):
                         stderr_lines.append(line)
+                        # 進捗の抽出とコールバック
+                        if progress_callback:
+                            match = FFmpegRunner.time_pattern.search(line)
+                            if match:
+                                h, m, s = match.groups()
+                                current_sec = int(h) * 3600 + int(m) * 60 + float(s)
+                                progress_callback(current_sec)
                 finally:
                     process.stderr.close()
 
